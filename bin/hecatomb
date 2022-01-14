@@ -82,7 +82,7 @@ args = parser.parse_args()
 ### GLOBAL VARIABLES
 SNEKDIR = os.path.normpath(os.path.join(BINDIR, '../', 'snakemake', 'workflow'))
 TESTDIR = os.path.normpath(os.path.join(BINDIR, '../', 'test_data'))
-CONDDIR = os.path.normpath(os.path.join(SNEKDIR, 'conda'))
+# CONDDIR = os.path.normpath(os.path.join(SNEKDIR, 'conda'))
 
 
 def readConfig():
@@ -115,13 +115,13 @@ def initialiseSnakeCommand():
         runJobs = f'-j {args.threads}'
     # Decorate the Snakemake run command
     command = (f'snakemake {runJobs} '
-               '--use-conda '
-               '--conda-frontend mamba '
+               # '--use-conda '
+               # '--conda-frontend mamba '
                '--rerun-incomplete '
                '--printshellcmds '
                '--nolock '
-               '--show-failed-logs '
-               f'--conda-prefix {CONDDIR} ')
+               '--show-failed-logs ')
+               # f'--conda-prefix {CONDDIR} ')
     # User-specified config file?
     if args.configfile:
         command = command + f' --configfile {args.configfile} '

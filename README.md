@@ -6,6 +6,17 @@
 
 ![](docs/img/hecatombLogo.png)
 
+***
+
+# *** This is a dev branch that should not spin up conda envs ***
+Install the dependencies for all rules from the requirements.txt file like so: 
+
+`conda create -n hecatombNoConda --file requirements.txt` 
+
+and run like normal.
+
+***
+
 A [hecatomb](https://en.wiktionary.org/wiki/hecatomb) is a great sacrifice or an extensive loss. 
 Heactomb the software empowers an analyst to make data driven decisions to *'sacrifice'* false-positive viral reads from 
 metagenomes to enrich for true-positive viral reads. 
