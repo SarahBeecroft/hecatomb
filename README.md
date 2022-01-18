@@ -1,8 +1,9 @@
-![](https://anaconda.org/beardymcjohnface/hecatomb/badges/platforms.svg)
-[![](https://anaconda.org/beardymcjohnface/hecatomb/badges/license.svg)](https://opensource.org/licenses/MIT)
-[![](https://anaconda.org/beardymcjohnface/hecatomb/badges/installer/conda.svg)](https://anaconda.org/beardymcjohnface/hecatomb)
-![](https://anaconda.org/beardymcjohnface/hecatomb/badges/downloads.svg)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/hecatomb/badges/latest_release_date.svg)](https://anaconda.org/bioconda/hecatomb)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/hecatomb/badges/platforms.svg)](https://anaconda.org/bioconda/hecatomb)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/hecatomb/badges/license.svg)](https://anaconda.org/bioconda/hecatomb)
 [![Documentation Status](https://readthedocs.org/projects/hecatomb/badge/?version=latest)](https://hecatomb.readthedocs.io/en/latest/?badge=latest)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/hecatomb/badges/downloads.svg)](https://anaconda.org/bioconda/hecatomb)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/hecatomb/badges/installer/conda.svg)](https://conda.anaconda.org/bioconda)
 
 ![](docs/img/hecatombLogo.png)
 
@@ -31,13 +32,13 @@ This process frequently results in a great loss of suspected viral sequences / c
 
 Hecatomb is powered by [Snakemake](https://snakemake.readthedocs.io/en/stable/#) and greatly benefits from the use of 
 Snakemake profiles for HPC Clusters.
-[More information and example for setting up Snakemake profiles for Hecatomb in the documentation](https://hecatomb.readthedocs.io/en/latest/advanced/#profiles-for-hpc-clusters).
+[More information and example for setting up Snakemake profiles for Hecatomb in the documentation](https://hecatomb.readthedocs.io/en/latest/profiles/).
 
 ### Install
 
 ```bash
 # create conda env and install
-conda create -n hecatomb -c conda-forge -c bioconda -c beardymcjohnface hecatomb
+conda create -n hecatomb -c conda-forge -c bioconda hecatomb
 
 # activate conda env
 conda activate hecatomb
@@ -97,4 +98,5 @@ All of Hecatomb's dependencies are installed during installation or runtime, so 
 
 [Hecatomb @ bio.tools](https://bio.tools/hecatomb)
 
+[Hecatomb @ WorkflowHub](https://workflowhub.eu/workflows/235)
 

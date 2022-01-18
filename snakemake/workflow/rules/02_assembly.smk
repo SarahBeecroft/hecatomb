@@ -21,7 +21,8 @@ rule assembly_kmer_normalization:
     log:
         os.path.join(STDERR, "kmer_norm_{sample}.log")
     resources:
-        mem_mb = BBToolsMem
+        mem_mb = BBToolsMem,
+        javaAlloc = int(0.95 * BBToolsMem)
     threads:
         BBToolsCPU
     conda:
@@ -33,7 +34,7 @@ rule assembly_kmer_normalization:
             out={output.r1_norm} out2={output.r2_norm} \
             target=100 \
             ow=t \
-            threads={threads} -Xmx{resources.mem_mb}m 2> {log}
+            threads={threads} -Xmx{resources.javaAlloc}m 2> {log}
         rm {log}
         """
 
@@ -64,9 +65,196 @@ rule individual_sample_assembly:
         "../envs/megahit.yaml"
     shell:
         """
-        rmdir {params.mh_dir}
+        if [ -d {params.mh_dir} ]; then
+            rm -rf {params.mh_dir}
+        fi
         megahit -1 {input.r1_norm} -2 {input.r2_norm} -r {input.r1s},{input.r2s} \
             -o {params.mh_dir} --out-prefix {wildcards.sample} \
+            --k-min 45 --k-max 225 --k-step 26 --min-count 2 -t {threads} &>> {log}
+        rm {log}
+        """
+
+rule mapSampleAssemblyPairedReads:
+    """Map the sample paired reads to the sample assembly"""
+    input:
+        r1 = os.path.join(TMPDIR,"p07","{sample}_R1.unmapped.fastq"),
+        r2 = os.path.join(TMPDIR,"p07","{sample}_R2.unmapped.fastq"),
+        contigs = os.path.join(ASSEMBLY, "{sample}", "{sample}.contigs.fa")
+    output:
+        temp(os.path.join(ASSEMBLY, '{sample}', '{sample}.pe.bam'))
+    conda:
+        os.path.join('..', 'envs', 'minimap2.yaml')
+    threads:
+        BBToolsCPU
+    resources:
+        mem_mb = BBToolsMem
+    log:
+        os.path.join(STDERR, 'sampleAssemblyMapPe.{sample}.log')
+    benchmark:
+        os.path.join(BENCH, 'sampleAssemblyMapPe.{sample}.txt')
+    shell:
+        """
+        minimap2 -t {threads} -ax sr {input.contigs} {input.r1} {input.r2} | \
+            samtools sort -n -o {output[0]}
+        """
+
+rule mapSampleAssemblyUnpairedReads:
+    """Map the sample unpaired reads to the sample assembly"""
+    input:
+        r1s = os.path.join(TMPDIR,"p07","{sample}_R1.singletons.fastq"),
+        r2s = os.path.join(TMPDIR,"p07","{sample}_R2.singletons.fastq"),
+        contigs= os.path.join(ASSEMBLY,"{sample}","{sample}.contigs.fa")
+    output:
+        temp(os.path.join(ASSEMBLY,'{sample}','{sample}.assemblyUnmapped.s.fastq'))
+    conda:
+        os.path.join('..', 'envs', 'minimap2.yaml')
+    threads:
+        BBToolsCPU
+    resources:
+        mem_mb = BBToolsMem
+    log:
+        os.path.join(STDERR, 'sampleAssemblyMapS.{sample}.log')
+    benchmark:
+        os.path.join(BENCH, 'sampleAssemblyMapS.{sample}.txt')
+    shell:
+        """
+        minimap2 -t {threads} -ax sr {input.contigs} {input.r1s} {input.r2s} | \
+            samtools sort -n | \
+            samtools fastq -f 4 > {output[0]}
+        """
+
+rule pullPairedUnmappedReads:
+    """Grab the paired unmapped reads (neither pair mapped)"""
+    input:
+        os.path.join(ASSEMBLY,'{sample}','{sample}.pe.bam')
+    output:
+        r1 = temp(os.path.join(ASSEMBLY, '{sample}', '{sample}.assemblyUnmapped_R1.fastq')),
+        r2 = temp(os.path.join(ASSEMBLY, '{sample}', '{sample}.assemblyUnmapped_R2.fastq'))
+    conda:
+        os.path.join('..','envs','samtools.yaml')
+    threads:
+        BBToolsCPU
+    resources:
+        mem_mb = BBToolsMem
+    log:
+        os.path.join(STDERR, 'pullPairedUnmappedReads.{sample}.log')
+    benchmark:
+        os.path.join(BENCH, 'pullPairedUnmappedReads.{sample}.txt')
+    shell:
+        """
+        samtools fastq -f 77 {input} > {output.r1}
+        samtools fastq -f 141 {input} > {output.r2}
+        """
+
+rule pullPairedUnmappedReadsMateMapped:
+    """Grab the paired unmapped reads (mate is mapped)"""
+    input:
+        os.path.join(ASSEMBLY,'{sample}','{sample}.pe.bam')
+    output:
+        temp(os.path.join(ASSEMBLY, '{sample}', '{sample}.assemblyUnmapped.pe.s.fastq'))
+    conda:
+        os.path.join('..','envs','samtools.yaml')
+    threads:
+        BBToolsCPU
+    resources:
+        mem_mb = BBToolsMem
+    log:
+        os.path.join(STDERR, 'pullPairedUnmappedReads.{sample}.log')
+    benchmark:
+        os.path.join(BENCH, 'pullPairedUnmappedReads.{sample}.txt')
+    shell:
+        """
+        samtools fastq -f5 -F8 {input[0]} > {output[0]}
+        """
+
+rule poolR1Unmapped:
+    """Concatenate the unmapped, paired R1 reads for all samples"""
+    input:
+        expand(os.path.join(ASSEMBLY, '{sample}', '{sample}.assemblyUnmapped_R1.fastq'), sample=SAMPLES)
+    output:
+        temp(os.path.join(ASSEMBLY, 'unmapRescue_R1.fastq'))
+    shell:
+        """cat {input} > {output}"""
+
+rule poolR2Unmapped:
+    """Concatenate the unmapped, paired R2 reads for all samples"""
+    input:
+        expand(os.path.join(ASSEMBLY, '{sample}', '{sample}.assemblyUnmapped_R2.fastq'), sample=SAMPLES)
+    output:
+        temp(os.path.join(ASSEMBLY, 'unmapRescue_R2.fastq'))
+    shell:
+        """cat {input} > {output}"""
+
+rule poolUnpairedUnmapped:
+    """Concatenate the unmapped, unpaired reads for all samples"""
+    input:
+        expand(os.path.join(ASSEMBLY,'{sample}','{sample}.assemblyUnmapped.{sPe}.fastq'), sample=SAMPLES, sPe = ['s','pe.s'])
+    output:
+        temp(os.path.join(ASSEMBLY, 'unmapRescue.s.fastq'))
+    shell:
+        """cat {input} > {output}"""
+
+rule rescue_read_kmer_normalization:
+    """Assembly step 01: Kmer normalization. Data reduction for assembly improvement"""
+    input:
+        r1 = os.path.join(ASSEMBLY, 'unmapRescue_R1.fastq'),
+        r2 = os.path.join(ASSEMBLY, 'unmapRescue_R2.fastq'),
+        s = os.path.join(ASSEMBLY, 'unmapRescue.s.fastq')
+    output:
+        r1_norm = temp(os.path.join(ASSEMBLY, 'unmapRescueNorm_R1.fastq')),
+        r2_norm = temp(os.path.join(ASSEMBLY, 'unmapRescueNorm_R2.fastq'))
+    benchmark:
+        os.path.join(BENCH, "rescue_read_kmer_normalization.txt")
+    log:
+        os.path.join(STDERR, "rescue_read_kmer_normalization.log")
+    resources:
+        mem_mb = BBToolsMem,
+        javaAlloc = int(0.95 * BBToolsMem)
+    threads:
+        BBToolsCPU
+    conda:
+        "../envs/bbmap.yaml"
+    shell:
+        """
+        bbnorm.sh in={input.r1} in2={input.r2} \
+            extra={input.s} \
+            out={output.r1_norm} out2={output.r2_norm} \
+            target=100 \
+            ow=t \
+            threads={threads} -Xmx{resources.javaAlloc}m 2> {log}
+        rm {log}
+        """
+
+rule unmapped_read_rescue_assembly:
+    """Assemble the unmapped reads from all samples
+
+    Megahit: https://github.com/voutcn/megahit
+    """
+    input:
+        r1_norm = os.path.join(ASSEMBLY, 'unmapRescueNorm_R1.fastq'),
+        r2_norm = os.path.join(ASSEMBLY, 'unmapRescueNorm_R2.fastq'),
+        s = os.path.join(ASSEMBLY, 'unmapRescue.s.fastq')
+    output:
+        contigs = os.path.join(ASSEMBLY, 'rescue', "rescue.contigs.fa")
+    params:
+        mh_dir = directory(os.path.join(ASSEMBLY, 'rescue'))
+    benchmark:
+        os.path.join(BENCH, "unmapped_read_rescue_assembly.txt")
+    log:
+        os.path.join(STDERR, "unmapped_read_rescue_assembly.log")
+    resources:
+        mem_mb = MhitMem
+    threads:
+        MhitCPU
+    conda:
+        "../envs/megahit.yaml"
+    shell:
+        """
+        if [ -d {params.mh_dir} ]; then
+            rm -rf {params.mh_dir}
+        fi
+        megahit -1 {input.r1_norm} -2 {input.r2_norm} -r {input.s} \
+            -o {params.mh_dir} --out-prefix rescue \
             --k-min 45 --k-max 225 --k-step 26 --min-count 2 -t {threads} &>> {log}
         rm {log}
         """
@@ -74,7 +262,8 @@ rule individual_sample_assembly:
 rule concatenate_contigs:
     """Assembly step 03: Concatenate individual assembly outputs (contigs) into a single file"""
     input:
-        expand(os.path.join(ASSEMBLY, "{sample}", "{sample}.contigs.fa"), sample=SAMPLES)
+        expand(os.path.join(ASSEMBLY, "{sample}", "{sample}.contigs.fa"), sample=SAMPLES),
+        os.path.join(ASSEMBLY,'rescue',"rescue.contigs.fa")
     output:
         os.path.join(ASSEMBLY, "CONTIG_DICTIONARY", "all_megahit_contigs.fasta")
     benchmark:
@@ -99,7 +288,8 @@ rule contig_reformating_and_stats:
         log2 = os.path.join(STDERR, "contig_reformating_and_stats.reformat.log"),
         log3 = os.path.join(STDERR, "contig_reformating_and_stats.stats.log")
     resources:
-        mem_mb = BBToolsMem
+        mem_mb = BBToolsMem,
+        javaAlloc = int(0.95 * BBToolsMem)
     threads:
         BBToolsCPU
     conda:
@@ -109,12 +299,12 @@ rule contig_reformating_and_stats:
         rename.sh in={input} out={output.rename} \
             prefix=contig_ \
             ow=t \
-            -Xmx{resources.mem_mb}m 2> {log.log1}
+            -Xmx{resources.javaAlloc}m 2> {log.log1}
         rm {log.log1}
         reformat.sh in={output.rename} out={output.size} \
             ml={config[CONTIG_MINLENGTH]} \
             ow=t \
-            -Xmx{resources.mem_mb}m 2> {log.log2}
+            -Xmx{resources.javaAlloc}m 2> {log.log2}
         rm {log.log2}
         statswrapper.sh in={input} out={output.stats} \
             format=2 \
@@ -179,7 +369,8 @@ rule coverage_calculations:
     log:
         os.path.join(STDERR, "coverage_calculations.{sample}.log")
     resources:
-        mem_mb = BBToolsMem
+        mem_mb = BBToolsMem,
+        javaAlloc = int(0.95 * BBToolsMem)
     threads:
         BBToolsCPU
     conda:
@@ -199,7 +390,7 @@ rule coverage_calculations:
             scafstats={output.scafstats} \
             maxindel=100 minid=90 \
             ow=t \
-            threads={threads} -Xmx{resources.mem_mb}m 2> {log}
+            threads={threads} -Xmx{resources.javaAlloc}m 2> {log}
         rm {log}
         """
 
@@ -221,34 +412,41 @@ rule create_contig_count_table:
         os.path.join(BENCH, "create_contig_count_table.{sample}.txt")
     log:
         os.path.join(STDERR, "create_contig_count_table.{sample}.log")
-    shell:
-        """
-        ## TPM Calculator
-        # Prepare table & calculate RPK
-        {{ tail -n+6 {input.rpkm} | \
-            cut -f1,2,5,6,8 | \
-            awk 'BEGIN{{ FS=OFS="\t" }} {{ print $0, $3/($2/1000) }}' > {output.counts_tmp};
-
-        # Calculate size factor (per million)
-        sizef=$(awk 'BEGIN{{ total=0 }} {{ total=total+$6/1000000 }} END{{ printf total }}' {output.counts_tmp});
-
-        # Calculate TPM
-        awk -v awkvar="$sizef" 'BEGIN{{ FS=OFS="\t" }} {{ print $0, $6/awkvar }}' < {output.counts_tmp} > {output.TPM_tmp};
-
-        # Add sample name
-        awk -v awkvar="{wildcards.sample}" 'BEGIN{{FS=OFS="\t"}} {{ print awkvar, $0 }}' < {output.TPM_tmp} > {output.TPM};
-
-        # Remove RPK
-        cut --complement -f 7 {output.TPM} > {output.TPM_final};
-
-        ## Coverage stats modifications
-        tail -n+2 {input.covstats} | cut -f2,4,5,6,9 > {output.cov_temp};
-
-        ## Combine tables
-        paste {output.TPM_final} {output.cov_temp} > {output.count_tbl};
-        }} 2> {log}
-        rm {log}
-        """
+    run:
+        covStat = {}
+        with open(input.covstats, 'r') as f:
+            for line in f:
+                if not line.startswith('#'):
+                    l = line.split('\t')
+                    covStat[l[0]] = [l[1],l[3],l[4],l[5],l[9]]
+        total = 0
+        with open(input.rpkm, 'r') as f:
+            for line in f:
+                if not line.startswith('#'):
+                    l = line.split('\t')
+                    rpk = l[2] / (l[1] / 1000)      # RPK
+                    total += rpk / 1000000         # size factor per million
+        with open(output.counts_tmp,'w') as o:
+            o.write('#Sample\tContig\tLength\tReads\tRPKM\tFPKM\tTPM\tAverageFold\tReferenceGC\tCoveragePercentage\tcoverageBases\tMedianFold\n')
+            with open(input.rpkm,'r') as f:
+                for line in f:
+                    if not line.startswith('#'):
+                        l = line.split('\t')
+                        rpk = l[2] / (l[1] / 1000)      # RPK
+                        try:
+                            tpm = rpk / total               # TPM
+                        except ZeroDivisionError:
+                            tpm = 0
+                        o.write( '\t'.join(
+                            wildcards.sample,       # sample
+                            l[0],                   # contig
+                            l[1],                   # length
+                            l[4],                   # reads
+                            l[5],                   # RPKM
+                            l[7],                   # FPKM
+                            tpm,                    # TPM
+                            covStat[l[0]]          # aveFole -> medianFold
+                        ) + '\n')
 
 rule concatentate_contig_count_tables:
     """Assembly step 09: Concatenate contig count tables
@@ -267,7 +465,7 @@ rule concatentate_contig_count_tables:
     shell:
         """
         {{ cat {input} > {output};
-        sed -i '1i sample_id\tcontig_id\tlength\treads\tRPKM\tFPKM\tTPM\tavg_fold_cov\tcontig_GC\tcov_perc\tcov_bases\tmedian_fold_cov' {output}; \
+            sed -i '1i sample_id\tcontig_id\tlength\treads\tRPKM\tFPKM\tTPM\tavg_fold_cov\tcontig_GC\tcov_perc\tcov_bases\tmedian_fold_cov' {output};
         }} 2> {log}
         rm {log}
         """

@@ -9,7 +9,7 @@ Michael Roach, Q2 2021
 
 
 # load default config
-configfile: os.path.join(workflow.basedir, '../', 'config', 'config.yaml')
+# configfile: os.path.join(workflow.basedir, '../', 'config', 'config.yaml')
 
 
 # directories
@@ -25,7 +25,7 @@ BBToolsMem = config['BBToolsMem']
 BBToolsCPU = config['BBToolsCPU']
 
 # output files
-hostOutFasta = os.path.join(HOSTPATH, 'masked_ref.fa.gz')
+hostOutFasta = os.path.join(HOSTPATH, hostName, 'masked_ref.fa.gz')
 
 
 rule all:

@@ -12,18 +12,15 @@ Overhauled: Michael Roach, Q2 2021
 """
 
 
-# imports
-import re
-
-
 ### DEFAULT CONFIG FILE
-configfile: os.path.join(workflow.basedir, '../', 'config', 'config.yaml')
+# configfile: os.path.join(workflow.basedir, '../', 'config', 'config.yaml')
 
 
 ### LAUNCHER-CONTROLLED CONFIG--"Reads" MUST BE PASSED TO SNAKEMAKE
 READS = config['Reads']
 HOST = config['Host']
 skipAssembly = config['SkipAssembly']
+makeReport = config['Report']
 if config['Fast']:
     MMSeqsSensAA = config['perfAAfast']
     MMSeqsSensNT = config['perfNTfast']
@@ -33,16 +30,16 @@ else:
 
 
 ### RESOURCE CONFIG
-MMSeqsMem = config['MMSeqsMem']
-MMSeqsCPU = config['MMSeqsCPU']
+MMSeqsMem = config['BigJobMem']
+MMSeqsCPU = config['BigJobCpu']
 MMSeqsMemSplit = str(int(0.75 * int(MMSeqsMem))) + 'M'
-MMSeqsTimeMin = config['MMSeqsTimeMin']
-BBToolsMem = config['BBToolsMem']
-BBToolsCPU = config['BBToolsCPU']
-MhitMem = config['MhitMem']
-MhitCPU = config['MhitCPU']
-MiscMem = config['MiscMem']
-MiscCPU = config['MiscCPU']
+MMSeqsTimeMin = config['BigJobTimeMin']
+MhitMem = config['MediumJobMem']
+MhitCPU = config['MediumJobCpu']
+BBToolsMem = config['SmallJobMem']
+BBToolsCPU = config['SmallJobCpu']
+MiscMem = config['MoreRamMem']
+MiscCPU = config['MoreRamCpu']
 
 
 ### DIRECTORIES

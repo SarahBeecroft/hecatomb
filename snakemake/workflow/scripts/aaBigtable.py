@@ -34,7 +34,6 @@ with open(snakemake.input.counts, 'r') as countfh:
         smplCounts[l[0]] = int(l[1])
 
 logging.debug('Reading in Taxon info for LCA seqs')
-medCount = median(counts)
 lcaLin = {}
 with open(snakemake.input.lca, 'r') as lcafh:
     for line in lcafh:
@@ -58,7 +57,7 @@ with open(snakemake.output[0], 'w') as out:
     out.write('\t'.join(('seqID',
                          'sampleID',
                          'count',
-                         'normCount',
+                         'CPM',
                          'alnType',     # aa or nt
                          'targetID',
                          'evalue',
@@ -100,9 +99,9 @@ with open(snakemake.output[0], 'w') as out:
                     taxOut = '\t'.join((['NA'] * 8))
             # seq ID = sample:count:seqNum
             seqInf = l[0].split(':')
-            tName =  re.sub('.*\||\s+\S+=.*','',l[18])
-            normCount = str(( int(seqInf[1]) / smplCounts[seqInf[0]] ) * medCount)
-            seqOut = '\t'.join((l[0], seqInf[0], seqInf[1], normCount))
+            tName =  re.sub('.*\||[a-zA-Z]+=.*','',l[18])
+            cpm = str(( int(seqInf[1]) / smplCounts[seqInf[0]] ) * 1000000)
+            seqOut = '\t'.join((l[0], seqInf[0], seqInf[1], cpm))
             # convert aa alignment len to equivalent nt alignment len
             l[15] = str(int(l[15]) * 3)
             alnOut = 'aa\t' + '\t'.join((l[1:17]))
